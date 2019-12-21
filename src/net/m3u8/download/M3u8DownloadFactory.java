@@ -1,6 +1,7 @@
 package net.m3u8.download;
 
 import net.m3u8.Exception.M3u8Exception;
+import net.m3u8.utils.MediaFormat;
 import net.m3u8.utils.StringUtils;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
@@ -11,6 +12,8 @@ import java.io.*;
 import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.Security;
 import java.security.spec.AlgorithmParameterSpec;
 import java.util.Comparator;
@@ -68,6 +71,15 @@ public class M3u8DownloadFactory {
 
         //密钥
         private String key = "";
+
+        //密钥字节
+        private byte[] keyBytes = new byte[16];
+
+        //key是否为字节
+        private boolean isByte = false;
+
+        //IV
+        private String iv = "";
 
         //所有ts片段下载链接
         private Set<String> tsSet = new LinkedHashSet<>();
@@ -165,7 +177,7 @@ public class M3u8DownloadFactory {
             File file = new File(dir);
             for (File f : file.listFiles()) {
                 if (!f.getName().contains(fileName + ".mp4"))
-                    f.deleteOnExit();
+                    f.delete();
             }
         }
 
@@ -187,6 +199,7 @@ public class M3u8DownloadFactory {
                 OutputStream outputStream = null;
                 InputStream inputStream1 = null;
                 FileOutputStream outputStream1 = null;
+                byte[] bytes = new byte[1024];
                 //重试次数判断
                 while (count <= retryCount) {
                     try {
@@ -204,7 +217,6 @@ public class M3u8DownloadFactory {
                             e.printStackTrace();
                         }
                         int len;
-                        byte[] bytes = new byte[1024];
                         //将未解密的ts片段写入文件
                         while ((len = inputStream.read(bytes)) != -1) {
                             outputStream.write(bytes, 0, len);
@@ -220,11 +232,14 @@ public class M3u8DownloadFactory {
                         File file = new File(dir + "\\" + i + ".xyz");
                         outputStream1 = new FileOutputStream(file);
                         //开始解密ts片段，这里我们把ts后缀改为了xyz，改不改都一样
-                        outputStream1.write(decrypt(bytes1, key, method));
+                        outputStream1.write(decrypt(bytes1, key, iv, method));
                         finishedFiles.add(file);
                         break;
                     } catch (Exception e) {
-
+                        if (e instanceof InvalidKeyException || e instanceof InvalidAlgorithmParameterException) {
+                            System.out.println("解密失败！");
+                            break;
+                        }
 //                        System.out.println("第" + count + "获取链接重试！\t" + urls);
                         count++;
 //                        e.printStackTrace();
@@ -258,7 +273,7 @@ public class M3u8DownloadFactory {
          * @return 链接是否被加密，null为非加密
          */
         private String getTsUrl() {
-            StringBuilder content = getUrlContent(DOWNLOADURL);
+            StringBuilder content = getUrlContent(DOWNLOADURL, false);
             //判断是否是m3u8链接
             if (!content.toString().contains("#EXTM3U"))
                 throw new M3u8Exception(DOWNLOADURL + "不是m3u8链接！");
@@ -301,7 +316,7 @@ public class M3u8DownloadFactory {
         private String getKey(String url, StringBuilder content) {
             StringBuilder urlContent;
             if (content == null || StringUtils.isEmpty(content.toString()))
-                urlContent = getUrlContent(url);
+                urlContent = getUrlContent(url, false);
             else urlContent = content;
             if (!urlContent.toString().contains("#EXTM3U"))
                 throw new M3u8Exception(DOWNLOADURL + "不是m3u8链接！");
@@ -309,23 +324,33 @@ public class M3u8DownloadFactory {
             for (String s : split) {
                 //如果含有此字段，则获取加密算法以及获取密钥的链接
                 if (s.contains("EXT-X-KEY")) {
-                    String[] split1 = s.split(",", 2);
-                    if (split1[0].contains("METHOD"))
-                        method = split1[0].split("=", 2)[1];
-                    if (split1[1].contains("URI"))
-                        key = split1[1].split("=", 2)[1];
+                    String[] split1 = s.split(",");
+                    for (String s1 : split1) {
+                        if (s1.contains("METHOD")) {
+                            method = s1.split("=", 2)[1];
+                            continue;
+                        }
+                        if (s1.contains("URI")) {
+                            key = s1.split("=", 2)[1];
+                            continue;
+                        }
+                        if (s1.contains("IV"))
+                            iv = s1.split("=", 2)[1];
+                    }
                 }
             }
             String relativeUrl = url.substring(0, url.lastIndexOf("/") + 1);
             //将ts片段链接加入set集合
             for (int i = 0; i < split.length; i++) {
                 String s = split[i];
-                if (s.contains("#EXTINF"))
-                    tsSet.add(relativeUrl + split[++i]);
+                if (s.contains("#EXTINF")) {
+                    String s1 = split[++i];
+                    tsSet.add(StringUtils.isUrl(s1) ? s1 : relativeUrl + s1);
+                }
             }
             if (!StringUtils.isEmpty(key)) {
                 key = key.replace("\"", "");
-                return getUrlContent(relativeUrl + key).toString().replaceAll("\\s+", "");
+                return getUrlContent(StringUtils.isUrl(key) ? key : relativeUrl + key, true).toString().replaceAll("\\s+", "");
             }
             return null;
         }
@@ -333,10 +358,11 @@ public class M3u8DownloadFactory {
         /**
          * 模拟http请求获取内容
          *
-         * @param urls http链接
+         * @param urls  http链接
+         * @param isKey 这个url链接是否用于获取key
          * @return 内容
          */
-        private StringBuilder getUrlContent(String urls) {
+        private StringBuilder getUrlContent(String urls, boolean isKey) {
             int count = 1;
             HttpURLConnection httpURLConnection = null;
             StringBuilder content = new StringBuilder();
@@ -348,9 +374,16 @@ public class M3u8DownloadFactory {
                     httpURLConnection.setReadTimeout((int) timeoutMillisecond);
                     httpURLConnection.setUseCaches(false);
                     httpURLConnection.setDoInput(true);
+                    httpURLConnection.addRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36");
                     String line;
                     InputStream inputStream = httpURLConnection.getInputStream();
                     BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
+                    if (isKey && inputStream.available() == 1 << 4) {
+                        isByte = true;
+                        inputStream.read(keyBytes);
+                        content.append("isByte");
+                        return content;
+                    }
                     while ((line = bufferedReader.readLine()) != null)
                         content.append(line).append("\n");
                     bufferedReader.close();
@@ -379,37 +412,38 @@ public class M3u8DownloadFactory {
          * @param sKey 密钥
          * @return 解密后的字节数组
          */
-        private static byte[] decrypt(byte[] sSrc, String sKey, String method) {
-            try {
-                if (StringUtils.isNotEmpty(method) && !method.contains("AES"))
-                    throw new M3u8Exception("未知的算法！");
-                // 判断Key是否正确
-                if (StringUtils.isEmpty(sKey)) {
-                    return sSrc;
-                }
-                // 判断Key是否为16位
-                if (sKey.length() != 16) {
-                    System.out.print("Key长度不是16位");
-                    return null;
-                }
-                Cipher cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
-                SecretKeySpec keySpec = new SecretKeySpec(sKey.getBytes("utf-8"), "AES");
-                //如果m3u8有IV标签，那么IvParameterSpec构造函数就把IV标签后的内容转成字节数组传进去
-                AlgorithmParameterSpec paramSpec = new IvParameterSpec(new byte[16]);
-                cipher.init(Cipher.DECRYPT_MODE, keySpec, paramSpec);
-                return cipher.doFinal(sSrc);
-            } catch (Exception ex) {
-                ex.printStackTrace();
+        private byte[] decrypt(byte[] sSrc, String sKey, String iv, String method) throws Exception {
+            if (StringUtils.isNotEmpty(method) && !method.contains("AES"))
+                throw new M3u8Exception("未知的算法！");
+            // 判断Key是否正确
+            if (StringUtils.isEmpty(sKey)) {
+                return sSrc;
+            }
+            // 判断Key是否为16位
+            if (sKey.length() != 16 && !isByte) {
+                System.out.print("Key长度不是16位");
                 return null;
             }
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
+            SecretKeySpec keySpec = new SecretKeySpec(isByte ? keyBytes : sKey.getBytes("utf-8"), "AES");
+            byte[] ivByte;
+            if (iv.startsWith("0x"))
+                ivByte = StringUtils.hexStringToByteArray(iv.substring(2));
+            else ivByte = iv.getBytes();
+            if (ivByte.length != 16)
+                ivByte = new byte[16];
+            //如果m3u8有IV标签，那么IvParameterSpec构造函数就把IV标签后的内容转成字节数组传进去
+            AlgorithmParameterSpec paramSpec = new IvParameterSpec(ivByte);
+            cipher.init(Cipher.DECRYPT_MODE, keySpec, paramSpec);
+            return cipher.doFinal(sSrc);
         }
 
         /**
          * 字段校验
          */
         private void checkField() {
-            if (!StringUtils.isUrl(DOWNLOADURL))
-                throw new M3u8Exception(DOWNLOADURL + "不是一个完整URL链接！");
+            if ("m3u8".compareTo(MediaFormat.getMediaFormat(DOWNLOADURL)) != 0)
+                throw new M3u8Exception(DOWNLOADURL + "不是一个完整m3u8链接！");
             if (threadCount <= 0)
                 throw new M3u8Exception("同时下载线程数只能大于0！");
             if (retryCount < 0)
