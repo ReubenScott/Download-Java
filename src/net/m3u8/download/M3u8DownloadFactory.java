@@ -16,6 +16,7 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Security;
 import java.security.spec.AlgorithmParameterSpec;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -378,10 +379,16 @@ public class M3u8DownloadFactory {
                     String line;
                     InputStream inputStream = httpURLConnection.getInputStream();
                     BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
-                    if (isKey && inputStream.available() == 1 << 4) {
+                    if (isKey) {
+                        byte[] bytes = new byte[128];
+                        int len;
+                        len = inputStream.read(bytes);
                         isByte = true;
-                        inputStream.read(keyBytes);
-                        content.append("isByte");
+                        if (len == 1 << 4) {
+                            keyBytes = Arrays.copyOf(bytes, 16);
+                            content.append("isByte");
+                        } else
+                            content.append(new String(Arrays.copyOf(bytes, len)));
                         return content;
                     }
                     while ((line = bufferedReader.readLine()) != null)
@@ -454,6 +461,14 @@ public class M3u8DownloadFactory {
                 throw new M3u8Exception("视频存储目录不能为空！");
             if (StringUtils.isEmpty(fileName))
                 throw new M3u8Exception("视频名称不能为空！");
+            finishedCount = 0;
+            method = "";
+            key = "";
+            isByte = false;
+            iv = "";
+            tsSet.clear();
+            finishedFiles.clear();
+            downloadBytes = new BigDecimal(0);
         }
 
         public String getDOWNLOADURL() {
