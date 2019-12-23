@@ -1,6 +1,7 @@
 package net.m3u8.download;
 
 import net.m3u8.Exception.M3u8Exception;
+import net.m3u8.utils.Constant;
 import net.m3u8.utils.MediaFormat;
 import net.m3u8.utils.StringUtils;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -23,6 +24,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import static net.m3u8.utils.Constant.FILESEPARATOR;
 
 /**
  * @author liyaling
@@ -150,7 +153,7 @@ public class M3u8DownloadFactory {
          */
         private void mergeTs() {
             try {
-                File file = new File(dir + "/" + fileName + ".mp4");
+                File file = new File(dir + FILESEPARATOR + fileName + ".mp4");
                 if (file.exists())
                     file.delete();
                 else file.createNewFile();
@@ -177,7 +180,7 @@ public class M3u8DownloadFactory {
         private void deleteFiles() {
             File file = new File(dir);
             for (File f : file.listFiles()) {
-                if (!f.getName().contains(fileName + ".mp4"))
+                if (!f.getName().endsWith(".mp4"))
                     f.delete();
             }
         }
@@ -194,7 +197,7 @@ public class M3u8DownloadFactory {
                 int count = 1;
                 HttpURLConnection httpURLConnection = null;
                 //xy为未解密的ts片段，如果存在，则删除
-                File file2 = new File(dir + "\\" + i + ".xy");
+                File file2 = new File(dir + FILESEPARATOR + i + ".xy");
                 if (file2.exists())
                     file2.delete();
                 OutputStream outputStream = null;
@@ -230,7 +233,7 @@ public class M3u8DownloadFactory {
                         inputStream1 = new FileInputStream(file2);
                         byte[] bytes1 = new byte[inputStream1.available()];
                         inputStream1.read(bytes1);
-                        File file = new File(dir + "\\" + i + ".xyz");
+                        File file = new File(dir + FILESEPARATOR + i + ".xyz");
                         outputStream1 = new FileOutputStream(file);
                         //开始解密ts片段，这里我们把ts后缀改为了xyz，改不改都一样
                         outputStream1.write(decrypt(bytes1, key, iv, method));
