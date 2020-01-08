@@ -1,7 +1,7 @@
 package net.m3u8.utils;
 
 /**
- * ³£Á¿
+ * å¸¸é‡
  *
  * @author liyaling
  * @email ts_liyaling@qq.com
@@ -10,7 +10,13 @@ package net.m3u8.utils;
 
 public class Constant {
 
-    //ÎÄ¼ş·Ö¸ô·û£¬ÔÚwindowÖĞÎª\\£¬ÔÚlinuxÖĞÎª/
+    //æ–‡ä»¶åˆ†éš”ç¬¦ï¼Œåœ¨windowä¸­ä¸º\\ï¼Œåœ¨linuxä¸­ä¸º/
     public static final String FILESEPARATOR = System.getProperty("file.separator");
+
+    //å› å­
+    public static final float FACTOR = 1.15F;
+
+    //é»˜è®¤æ–‡ä»¶æ¯æ¬¡è¯»å–å­—èŠ‚æ•°
+    public static final int BYTE_COUNT = 40960;
 
 }
