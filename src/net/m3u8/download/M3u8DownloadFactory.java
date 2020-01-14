@@ -287,7 +287,10 @@ public class M3u8DownloadFactory {
                         File file = new File(dir + FILESEPARATOR + i + ".xyz");
                         outputStream1 = new FileOutputStream(file);
                         //开始解密ts片段，这里我们把ts后缀改为了xyz，改不改都一样
-                        outputStream1.write(decrypt(bytes, available, key, iv, method), 0, available);
+                        byte[] decrypt = decrypt(bytes, available, key, iv, method);
+                        if (decrypt == null)
+                            outputStream1.write(bytes, 0, available);
+                        else outputStream1.write(decrypt);
                         finishedFiles.add(file);
                         break;
                     } catch (Exception e) {
@@ -480,7 +483,7 @@ public class M3u8DownloadFactory {
                 throw new M3u8Exception("未知的算法！");
             // 判断Key是否正确
             if (StringUtils.isEmpty(sKey))
-                return sSrc;
+                return null;
             // 判断Key是否为16位
             if (sKey.length() != 16 && !isByte) {
                 throw new M3u8Exception("Key长度不是16位！");
