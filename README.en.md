@@ -53,6 +53,8 @@ m3u8Download.addListener(new DownloadListener() {
 m3u8Download.start();
 </pre>
 
+<h2>log</h2>
+
 <h4>2020.01.14</h4>
 * add progress listener feature
 

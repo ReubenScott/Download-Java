@@ -53,6 +53,8 @@ m3u8Download.addListener(new DownloadListener() {
 m3u8Download.start();
 </pre>
 
+<h2>更新日志</h2>
+
 <h4>2020.01.14</h4>
 * 增加进度监听功能
 
