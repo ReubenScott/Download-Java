@@ -25,9 +25,36 @@ m3u8Download.setThreadCount(100);
 m3u8Download.setRetryCount(100);
 //set connection timeout (ms)
 m3u8Download.setTimeoutMillisecond(10000L);
+//set log level
+//available：NONE INFO DEBUG ERROR
+ m3u8Download.setLogLevel(Constant.DEBUG);
+//set listener interval（ms）
+m3u8Download.setInterval(500L);
+//add listener to download
+m3u8Download.addListener(new DownloadListener() {
+    @Override
+    public void start() {
+        System.out.println("start download！");
+    }
+    @Override
+    public void process(String downloadUrl, int finished, int sum, float percent) {
+        System.out.println("download link：" + downloadUrl + "\t have finished" + finished + "\t total" + sum + "\t finished percentage" + percent + "%");
+    }
+    @Override
+    public void speed(String speedPerSecond) {
+        System.out.println("download speed："+speedPerSecond);
+    }
+    @Override
+    public void end() {
+        System.out.println("download is complete");
+    }
+});
 //start download
 m3u8Download.start();
 </pre>
+
+<h4>2020.01.14</h4>
+* add progress listener feature
 
 <h4>2020.01.08</h4>
 * memory optimization

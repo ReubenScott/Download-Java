@@ -6,7 +6,7 @@ package net.m3u8.Exception;
  * @date 2019/12/14 16:23
  */
 
-public class M3u8Exception extends RuntimeException{
+public class M3u8Exception extends RuntimeException {
     public M3u8Exception() {
         super();
     }

@@ -1,7 +1,9 @@
 package net.m3u8.download;
 
 import net.m3u8.Exception.M3u8Exception;
+import net.m3u8.listener.DownloadListener;
 import net.m3u8.utils.Constant;
+import net.m3u8.utils.Log;
 import net.m3u8.utils.MediaFormat;
 import net.m3u8.utils.StringUtils;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -18,13 +20,11 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Security;
 import java.security.spec.AlgorithmParameterSpec;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.*;
 
 import static net.m3u8.utils.Constant.FILESEPARATOR;
+import static net.m3u8.utils.Constant.NONE;
 
 /**
  * @author liyaling
@@ -52,7 +52,7 @@ public class M3u8DownloadFactory {
         private final String DOWNLOADURL;
 
         //优化内存占用
-        private static final LinkedBlockingQueue<byte[]> BLOCKING_QUEUE = new LinkedBlockingQueue<>();
+        private static final BlockingQueue<byte[]> BLOCKING_QUEUE = new LinkedBlockingQueue<>();
 
         //线程数
         private int threadCount = 1;
@@ -96,6 +96,11 @@ public class M3u8DownloadFactory {
         //已经下载的文件大小
         private BigDecimal downloadBytes = new BigDecimal(0);
 
+        //监听间隔
+        private volatile long interval = 0L;
+
+        //监听事件
+        private Set<DownloadListener> listenerSet = new HashSet<>(5);
 
         /**
          * 开始下载视频
@@ -105,7 +110,7 @@ public class M3u8DownloadFactory {
             checkField();
             String tsUrl = getTsUrl();
             if (StringUtils.isEmpty(tsUrl))
-                System.out.println("不需要解密");
+                Log.i("不需要解密");
             startDownload();
         }
 
@@ -128,27 +133,60 @@ public class M3u8DownloadFactory {
             }
             fixedThreadPool.shutdown();
             //下载过程监视
+            if (Log.getLevel() != NONE)
+                new Thread(() -> {
+                    int consume = 0;
+                    //轮询是否下载成功
+                    while (!fixedThreadPool.isTerminated()) {
+                        try {
+                            consume++;
+                            BigDecimal bigDecimal = new BigDecimal(downloadBytes.toString());
+                            Thread.sleep(1000L);
+                            Log.i("已用时" + consume + "秒！\t下载速度：" + StringUtils.convertToDownloadSpeed(new BigDecimal(downloadBytes.toString()).subtract(bigDecimal), 3) + "/s");
+                            Log.i("\t已完成" + finishedCount + "个，还剩" + (tsSet.size() - finishedCount) + "个！");
+                            Log.i(new BigDecimal(finishedCount).divide(new BigDecimal(tsSet.size()), 4, BigDecimal.ROUND_HALF_UP).multiply(new BigDecimal(100)).setScale(2, BigDecimal.ROUND_HALF_UP) + "%");
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    Log.i("下载完成，正在合并文件！共" + finishedFiles.size() + "个！" + StringUtils.convertToDownloadSpeed(downloadBytes, 3));
+                    //开始合并视频
+                    mergeTs();
+                    //删除多余的ts片段
+                    deleteFiles();
+                    Log.i("视频合并完成，欢迎使用!");
+                }).start();
+            startListener(fixedThreadPool);
+        }
+
+        private void startListener(ExecutorService fixedThreadPool) {
             new Thread(() -> {
-                int consume = 0;
+                for (DownloadListener downloadListener : listenerSet)
+                    downloadListener.start();
                 //轮询是否下载成功
                 while (!fixedThreadPool.isTerminated()) {
                     try {
-                        consume++;
-                        BigDecimal bigDecimal = new BigDecimal(downloadBytes.toString());
-                        Thread.sleep(1000L);
-                        System.out.print("已用时" + consume + "秒！\t下载速度：" + StringUtils.convertToDownloadSpeed(new BigDecimal(downloadBytes.toString()).subtract(bigDecimal), 3) + "/s");
-                        System.out.print("\t已完成" + finishedCount + "个，还剩" + (tsSet.size() - finishedCount) + "个！");
-                        System.out.println(new BigDecimal(finishedCount).divide(new BigDecimal(tsSet.size()), 4, BigDecimal.ROUND_HALF_UP).multiply(new BigDecimal(100)).setScale(2, BigDecimal.ROUND_HALF_UP) + "%");
+                        Thread.sleep(interval);
+                        for (DownloadListener downloadListener : listenerSet)
+                            downloadListener.process(DOWNLOADURL, finishedCount, tsSet.size(), new BigDecimal(finishedCount).divide(new BigDecimal(tsSet.size()), 4, BigDecimal.ROUND_HALF_UP).multiply(new BigDecimal(100)).setScale(2, BigDecimal.ROUND_HALF_UP).floatValue());
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
                 }
-                System.out.println("下载完成，正在合并文件！共" + finishedFiles.size() + "个！" + StringUtils.convertToDownloadSpeed(downloadBytes, 3));
-                //开始合并视频
-                mergeTs();
-                //删除多余的ts片段
-                deleteFiles();
-                System.out.println("视频合并完成，欢迎使用!");
+                for (DownloadListener downloadListener : listenerSet)
+                    downloadListener.end();
+            }).start();
+            new Thread(() -> {
+                while (!fixedThreadPool.isTerminated()) {
+                    try {
+                        BigDecimal bigDecimal = new BigDecimal(downloadBytes.toString());
+                        Thread.sleep(1000L);
+                        for (DownloadListener downloadListener : listenerSet)
+                            downloadListener.speed(StringUtils.convertToDownloadSpeed(new BigDecimal(downloadBytes.toString()).subtract(bigDecimal), 3) + "/s");
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
             }).start();
         }
 
@@ -158,6 +196,7 @@ public class M3u8DownloadFactory {
         private void mergeTs() {
             try {
                 File file = new File(dir + FILESEPARATOR + fileName + ".mp4");
+                System.gc();
                 if (file.exists())
                     file.delete();
                 else file.createNewFile();
@@ -253,10 +292,10 @@ public class M3u8DownloadFactory {
                         break;
                     } catch (Exception e) {
                         if (e instanceof InvalidKeyException || e instanceof InvalidAlgorithmParameterException) {
-                            System.out.println("解密失败！");
+                            Log.e("解密失败！");
                             break;
                         }
-//                        System.out.println("第" + count + "获取链接重试！\t" + urls);
+                        Log.d("第" + count + "获取链接重试！\t" + urls);
                         count++;
 //                        e.printStackTrace();
                     } finally {
@@ -280,7 +319,7 @@ public class M3u8DownloadFactory {
                     //自定义异常
                     throw new M3u8Exception("连接超时！");
                 finishedCount++;
-//                System.out.println(urls + "下载完毕！\t已完成" + finishedCount + "个，还剩" + (tsSet.size() - finishedCount) + "个！");
+//                Log.i(urls + "下载完毕！\t已完成" + finishedCount + "个，还剩" + (tsSet.size() - finishedCount) + "个！");
             });
         }
 
@@ -411,10 +450,10 @@ public class M3u8DownloadFactory {
                         content.append(line).append("\n");
                     bufferedReader.close();
                     inputStream.close();
-                    System.out.println(content);
+                    Log.i(content);
                     break;
                 } catch (Exception e) {
-//                    System.out.println("第" + count + "获取链接重试！\t" + urls);
+                    Log.d("第" + count + "获取链接重试！\t" + urls);
                     count++;
 //                    e.printStackTrace();
                 } finally {
@@ -540,6 +579,18 @@ public class M3u8DownloadFactory {
 
         public int getFinishedCount() {
             return finishedCount;
+        }
+
+        public void setLogLevel(int level) {
+            Log.setLevel(level);
+        }
+
+        public void setInterval(long interval) {
+            this.interval = interval;
+        }
+
+        public void addListener(DownloadListener downloadListener) {
+            listenerSet.add(downloadListener);
         }
 
         private M3u8Download(String DOWNLOADURL) {
