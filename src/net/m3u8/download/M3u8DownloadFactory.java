@@ -1,7 +1,6 @@
 package net.m3u8.download;
 
 import net.m3u8.Exception.M3u8Exception;
-import net.m3u8.utils.Constant;
 import net.m3u8.utils.MediaFormat;
 import net.m3u8.utils.StringUtils;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -24,8 +23,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import static net.m3u8.utils.Constant.FILESEPARATOR;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @author liyaling
@@ -48,6 +47,8 @@ public class M3u8DownloadFactory {
 
 
     public static class M3u8Download {
+
+        private static final LinkedBlockingQueue<byte[]> blockingQueue = new LinkedBlockingQueue<>();
 
         //要下载的m3u8链接
         private final String DOWNLOADURL;
@@ -94,6 +95,9 @@ public class M3u8DownloadFactory {
         //已经下载的文件大小
         private BigDecimal downloadBytes = new BigDecimal(0);
 
+
+        private AtomicLong l = new AtomicLong(0L);
+
         /**
          * 开始下载视频
          */
@@ -134,6 +138,7 @@ public class M3u8DownloadFactory {
                         Thread.sleep(1000L);
                         System.out.print("已用时" + consume + "秒！\t下载速度：" + StringUtils.convertToDownloadSpeed(new BigDecimal(downloadBytes.toString()).subtract(bigDecimal), 3) + "/s");
                         System.out.print("\t已完成" + finishedCount + "个，还剩" + (tsSet.size() - finishedCount) + "个！");
+                        System.out.print("\t以用内存：" + StringUtils.convertToDownloadSpeed(new BigDecimal(l.get()), 3) + "\t");
                         System.out.println(new BigDecimal(finishedCount).divide(new BigDecimal(tsSet.size()), 4, BigDecimal.ROUND_HALF_UP).multiply(new BigDecimal(100)).setScale(2, BigDecimal.ROUND_HALF_UP) + "%");
                     } catch (InterruptedException e) {
                         e.printStackTrace();
@@ -153,7 +158,7 @@ public class M3u8DownloadFactory {
          */
         private void mergeTs() {
             try {
-                File file = new File(dir + FILESEPARATOR + fileName + ".mp4");
+                File file = new File(dir + "/" + fileName + ".mp4");
                 if (file.exists())
                     file.delete();
                 else file.createNewFile();
@@ -180,7 +185,7 @@ public class M3u8DownloadFactory {
         private void deleteFiles() {
             File file = new File(dir);
             for (File f : file.listFiles()) {
-                if (!f.getName().endsWith(".mp4"))
+                if (!f.getName().contains(fileName + ".mp4"))
                     f.delete();
             }
         }
@@ -197,13 +202,22 @@ public class M3u8DownloadFactory {
                 int count = 1;
                 HttpURLConnection httpURLConnection = null;
                 //xy为未解密的ts片段，如果存在，则删除
-                File file2 = new File(dir + FILESEPARATOR + i + ".xy");
+                File file2 = new File(dir + "\\" + i + ".xy");
                 if (file2.exists())
                     file2.delete();
                 OutputStream outputStream = null;
                 InputStream inputStream1 = null;
                 FileOutputStream outputStream1 = null;
                 byte[] bytes = new byte[1024];
+                byte[] bytes1;
+                try {
+                    bytes1 = blockingQueue.take();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    bytes1 = new byte[500 * 1024];
+                    l.addAndGet(500 * 1024);
+                }
+                l.addAndGet(1024L);
                 //重试次数判断
                 while (count <= retryCount) {
                     try {
@@ -231,13 +245,18 @@ public class M3u8DownloadFactory {
                         outputStream.flush();
                         inputStream.close();
                         inputStream1 = new FileInputStream(file2);
-                        byte[] bytes1 = new byte[inputStream1.available()];
-                        inputStream1.read(bytes1);
-                        File file = new File(dir + FILESEPARATOR + i + ".xyz");
+                        int available = inputStream1.available();
+                        if (bytes1.length < available) {
+                            bytes1 = new byte[available];
+                            l.addAndGet(available);
+                        }
+                        int read = inputStream1.read(bytes1);
+                        File file = new File(dir + "\\" + i + ".xyz");
                         outputStream1 = new FileOutputStream(file);
                         //开始解密ts片段，这里我们把ts后缀改为了xyz，改不改都一样
-                        outputStream1.write(decrypt(bytes1, key, iv, method));
                         finishedFiles.add(file);
+                        outputStream1.write(decrypt(bytes1, read, key, iv, method));
+                        blockingQueue.put(bytes1);
                         break;
                     } catch (Exception e) {
                         if (e instanceof InvalidKeyException || e instanceof InvalidAlgorithmParameterException) {
@@ -384,6 +403,7 @@ public class M3u8DownloadFactory {
                     BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
                     if (isKey) {
                         byte[] bytes = new byte[128];
+                        l.addAndGet(128);
                         int len;
                         len = inputStream.read(bytes);
                         isByte = true;
@@ -422,17 +442,17 @@ public class M3u8DownloadFactory {
          * @param sKey 密钥
          * @return 解密后的字节数组
          */
-        private byte[] decrypt(byte[] sSrc, String sKey, String iv, String method) throws Exception {
+        private byte[] decrypt(byte[] sSrc, int len, String sKey, String iv, String method) throws Exception {
             if (StringUtils.isNotEmpty(method) && !method.contains("AES"))
                 throw new M3u8Exception("未知的算法！");
             // 判断Key是否正确
             if (StringUtils.isEmpty(sKey)) {
-                return sSrc;
+               throw new M3u8Exception("key不正确！");
             }
             // 判断Key是否为16位
             if (sKey.length() != 16 && !isByte) {
                 System.out.print("Key长度不是16位");
-                return null;
+                throw new M3u8Exception("Key长度不是16位");
             }
             Cipher cipher = Cipher.getInstance("AES/CBC/PKCS7Padding");
             SecretKeySpec keySpec = new SecretKeySpec(isByte ? keyBytes : sKey.getBytes("utf-8"), "AES");
@@ -440,12 +460,14 @@ public class M3u8DownloadFactory {
             if (iv.startsWith("0x"))
                 ivByte = StringUtils.hexStringToByteArray(iv.substring(2));
             else ivByte = iv.getBytes();
-            if (ivByte.length != 16)
+            if (ivByte.length != 16) {
                 ivByte = new byte[16];
+                l.addAndGet(16);
+            }
             //如果m3u8有IV标签，那么IvParameterSpec构造函数就把IV标签后的内容转成字节数组传进去
             AlgorithmParameterSpec paramSpec = new IvParameterSpec(ivByte);
             cipher.init(Cipher.DECRYPT_MODE, keySpec, paramSpec);
-            return cipher.doFinal(sSrc);
+            return cipher.doFinal(sSrc, 0, len);
         }
 
         /**
@@ -483,6 +505,11 @@ public class M3u8DownloadFactory {
         }
 
         public void setThreadCount(int threadCount) {
+            if (threadCount > this.threadCount)
+                for (int i = (int) (this.threadCount * 1.2); i < threadCount * 1.2; i++) {
+                    blockingQueue.add(new byte[500 * 1024]);
+                    l.addAndGet(500 * 1024);
+                }
             this.threadCount = threadCount;
         }
 
@@ -524,6 +551,10 @@ public class M3u8DownloadFactory {
 
         private M3u8Download(String DOWNLOADURL) {
             this.DOWNLOADURL = DOWNLOADURL;
+            for (int i = 0; i < threadCount * 1.2; i++) {
+                blockingQueue.add(new byte[500 * 1024]);
+                l.addAndGet(500 * 1024);
+            }
         }
     }
 
