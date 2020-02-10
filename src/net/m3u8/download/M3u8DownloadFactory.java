@@ -24,7 +24,6 @@ import java.util.*;
 import java.util.concurrent.*;
 
 import static net.m3u8.utils.Constant.FILESEPARATOR;
-import static net.m3u8.utils.Constant.NONE;
 
 /**
  * @author liyaling
@@ -133,29 +132,28 @@ public class M3u8DownloadFactory {
             }
             fixedThreadPool.shutdown();
             //下载过程监视
-            if (Log.getLevel() != NONE)
-                new Thread(() -> {
-                    int consume = 0;
-                    //轮询是否下载成功
-                    while (!fixedThreadPool.isTerminated()) {
-                        try {
-                            consume++;
-                            BigDecimal bigDecimal = new BigDecimal(downloadBytes.toString());
-                            Thread.sleep(1000L);
-                            Log.i("已用时" + consume + "秒！\t下载速度：" + StringUtils.convertToDownloadSpeed(new BigDecimal(downloadBytes.toString()).subtract(bigDecimal), 3) + "/s");
-                            Log.i("\t已完成" + finishedCount + "个，还剩" + (tsSet.size() - finishedCount) + "个！");
-                            Log.i(new BigDecimal(finishedCount).divide(new BigDecimal(tsSet.size()), 4, BigDecimal.ROUND_HALF_UP).multiply(new BigDecimal(100)).setScale(2, BigDecimal.ROUND_HALF_UP) + "%");
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+            new Thread(() -> {
+                int consume = 0;
+                //轮询是否下载成功
+                while (!fixedThreadPool.isTerminated()) {
+                    try {
+                        consume++;
+                        BigDecimal bigDecimal = new BigDecimal(downloadBytes.toString());
+                        Thread.sleep(1000L);
+                        Log.i("已用时" + consume + "秒！\t下载速度：" + StringUtils.convertToDownloadSpeed(new BigDecimal(downloadBytes.toString()).subtract(bigDecimal), 3) + "/s");
+                        Log.i("\t已完成" + finishedCount + "个，还剩" + (tsSet.size() - finishedCount) + "个！");
+                        Log.i(new BigDecimal(finishedCount).divide(new BigDecimal(tsSet.size()), 4, BigDecimal.ROUND_HALF_UP).multiply(new BigDecimal(100)).setScale(2, BigDecimal.ROUND_HALF_UP) + "%");
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
-                    Log.i("下载完成，正在合并文件！共" + finishedFiles.size() + "个！" + StringUtils.convertToDownloadSpeed(downloadBytes, 3));
-                    //开始合并视频
-                    mergeTs();
-                    //删除多余的ts片段
-                    deleteFiles();
-                    Log.i("视频合并完成，欢迎使用!");
-                }).start();
+                }
+                Log.i("下载完成，正在合并文件！共" + finishedFiles.size() + "个！" + StringUtils.convertToDownloadSpeed(downloadBytes, 3));
+                //开始合并视频
+                mergeTs();
+                //删除多余的ts片段
+                deleteFiles();
+                Log.i("视频合并完成，欢迎使用!");
+            }).start();
             startListener(fixedThreadPool);
         }
 

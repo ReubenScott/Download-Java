@@ -55,6 +55,9 @@ m3u8Download.start();
 
 <h2>log</h2>
 
+<h4>2020.02.10</h4>
+* Resolved an issue where files could not be merged when log level is NONE
+
 <h4>2020.01.14</h4>
 * add progress listener feature
 
@@ -75,3 +78,6 @@ m3u8Download.start();
 * resolve link retrieval errors
 * add IV vector offset decryption
 * Resolved the problem that the program didn't exit after merging files
+
+<h2>Tip</h2>
+If you have any questions,you can email to ts_liyaling.qq.com.
