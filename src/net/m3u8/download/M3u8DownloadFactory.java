@@ -98,6 +98,10 @@ public class M3u8DownloadFactory {
         //监听间隔
         private volatile long interval = 0L;
 
+        //自定义请求头
+        private Map<String, String> requestHeaderMap = new HashMap<>();
+        ;
+
         //监听事件
         private Set<DownloadListener> listenerSet = new HashSet<>(5);
 
@@ -257,6 +261,8 @@ public class M3u8DownloadFactory {
                         URL url = new URL(urls);
                         httpURLConnection = (HttpURLConnection) url.openConnection();
                         httpURLConnection.setConnectTimeout((int) timeoutMillisecond);
+                        for (Map.Entry<String, String> entry : requestHeaderMap.entrySet())
+                            httpURLConnection.addRequestProperty(entry.getKey(), entry.getValue());
                         httpURLConnection.setUseCaches(false);
                         httpURLConnection.setReadTimeout((int) timeoutMillisecond);
                         httpURLConnection.setDoInput(true);
@@ -431,7 +437,8 @@ public class M3u8DownloadFactory {
                     httpURLConnection.setReadTimeout((int) timeoutMillisecond);
                     httpURLConnection.setUseCaches(false);
                     httpURLConnection.setDoInput(true);
-                    httpURLConnection.addRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36");
+                    for (Map.Entry<String, String> entry : requestHeaderMap.entrySet())
+                        httpURLConnection.addRequestProperty(entry.getKey(), entry.getValue());
                     String line;
                     InputStream inputStream = httpURLConnection.getInputStream();
                     BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
@@ -586,6 +593,14 @@ public class M3u8DownloadFactory {
             Log.setLevel(level);
         }
 
+        public Map<String, String> getRequestHeaderMap() {
+            return requestHeaderMap;
+        }
+
+        public void addRequestHeaderMap(Map<String, String> requestHeaderMap) {
+            this.requestHeaderMap.putAll(requestHeaderMap);
+        }
+
         public void setInterval(long interval) {
             this.interval = interval;
         }
@@ -596,6 +611,7 @@ public class M3u8DownloadFactory {
 
         private M3u8Download(String DOWNLOADURL) {
             this.DOWNLOADURL = DOWNLOADURL;
+            requestHeaderMap.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36");
         }
     }
 
