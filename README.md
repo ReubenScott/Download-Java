@@ -25,6 +25,10 @@ m3u8Download.setThreadCount(100);
 m3u8Download.setRetryCount(100);
 //设置连接超时时间（单位：毫秒）
 m3u8Download.setTimeoutMillisecond(10000L);
+//添加额外请求头
+  /*  Map<String, Object> headersMap = new HashMap<>();
+    headersMap.put("Content-Type", "text/html;charset=utf-8");
+    m3u8Download.addRequestHeaderMap(headersMap);*/
 //设置日志级别
 //可选值：NONE INFO DEBUG ERROR
  m3u8Download.setLogLevel(Constant.DEBUG);
@@ -54,6 +58,10 @@ m3u8Download.start();
 </pre>
 
 <h2>更新日志</h2>
+
+<h4>2020.04.01</h4>
+* 解决链接转换问题
+* 添加自定义请求头功能
 
 <h4>2020.02.10</h4>
 * 解决日志级别为NONE模式下无法合并文件的问题

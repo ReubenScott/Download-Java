@@ -99,7 +99,7 @@ public class M3u8DownloadFactory {
         private volatile long interval = 0L;
 
         //自定义请求头
-        private Map<String, String> requestHeaderMap = new HashMap<>();
+        private Map<String, Object> requestHeaderMap = new HashMap<>();
         ;
 
         //监听事件
@@ -261,8 +261,8 @@ public class M3u8DownloadFactory {
                         URL url = new URL(urls);
                         httpURLConnection = (HttpURLConnection) url.openConnection();
                         httpURLConnection.setConnectTimeout((int) timeoutMillisecond);
-                        for (Map.Entry<String, String> entry : requestHeaderMap.entrySet())
-                            httpURLConnection.addRequestProperty(entry.getKey(), entry.getValue());
+                        for (Map.Entry<String, Object> entry : requestHeaderMap.entrySet())
+                            httpURLConnection.addRequestProperty(entry.getKey(), entry.getValue().toString());
                         httpURLConnection.setUseCaches(false);
                         httpURLConnection.setReadTimeout((int) timeoutMillisecond);
                         httpURLConnection.setDoInput(true);
@@ -355,7 +355,9 @@ public class M3u8DownloadFactory {
                     if (StringUtils.isUrl(s))
                         return s;
                     String relativeUrl = DOWNLOADURL.substring(0, DOWNLOADURL.lastIndexOf("/") + 1);
-                    keyUrl = relativeUrl + s;
+                    if (s.startsWith("/"))
+                        s = s.replaceFirst("/", "");
+                    keyUrl = mergeUrl(relativeUrl, s);
                     break;
                 }
             }
@@ -408,7 +410,7 @@ public class M3u8DownloadFactory {
                 String s = split[i];
                 if (s.contains("#EXTINF")) {
                     String s1 = split[++i];
-                    tsSet.add(StringUtils.isUrl(s1) ? s1 : relativeUrl + s1);
+                    tsSet.add(StringUtils.isUrl(s1) ? s1 : mergeUrl(relativeUrl, s1));
                 }
             }
             if (!StringUtils.isEmpty(key)) {
@@ -437,8 +439,8 @@ public class M3u8DownloadFactory {
                     httpURLConnection.setReadTimeout((int) timeoutMillisecond);
                     httpURLConnection.setUseCaches(false);
                     httpURLConnection.setDoInput(true);
-                    for (Map.Entry<String, String> entry : requestHeaderMap.entrySet())
-                        httpURLConnection.addRequestProperty(entry.getKey(), entry.getValue());
+                    for (Map.Entry<String, Object> entry : requestHeaderMap.entrySet())
+                        httpURLConnection.addRequestProperty(entry.getKey(), entry.getValue().toString());
                     String line;
                     InputStream inputStream = httpURLConnection.getInputStream();
                     BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
@@ -533,6 +535,16 @@ public class M3u8DownloadFactory {
             downloadBytes = new BigDecimal(0);
         }
 
+        private String mergeUrl(String start, String end) {
+            if (end.startsWith("/"))
+                end = end.replaceFirst("/", "");
+            for (String s1 : end.split("/")) {
+                if (start.contains(s1))
+                    start = start.replace(s1 + "/", "");
+            }
+            return start + end;
+        }
+
         public String getDOWNLOADURL() {
             return DOWNLOADURL;
         }
@@ -593,11 +605,11 @@ public class M3u8DownloadFactory {
             Log.setLevel(level);
         }
 
-        public Map<String, String> getRequestHeaderMap() {
+        public Map<String, Object> getRequestHeaderMap() {
             return requestHeaderMap;
         }
 
-        public void addRequestHeaderMap(Map<String, String> requestHeaderMap) {
+        public void addRequestHeaderMap(Map<String, Object> requestHeaderMap) {
             this.requestHeaderMap.putAll(requestHeaderMap);
         }
 

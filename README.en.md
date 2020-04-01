@@ -23,8 +23,12 @@ m3u8Download.setFileName("test");
 m3u8Download.setThreadCount(100);
 //set retry count
 m3u8Download.setRetryCount(100);
-//set connection timeout (ms)
+//set connection timeout in millisecond
 m3u8Download.setTimeoutMillisecond(10000L);
+//add extra request headers to the request
+  /*  Map<String, Object> headersMap = new HashMap<>();
+    headersMap.put("Content-Type", "text/html;charset=utf-8");
+    m3u8Download.addRequestHeaderMap(headersMap);*/
 //set log level
 //available：NONE INFO DEBUG ERROR
  m3u8Download.setLogLevel(Constant.DEBUG);
@@ -55,8 +59,12 @@ m3u8Download.start();
 
 <h2>log</h2>
 
+<h4>2020.04.01</h4>
+* fix link conversion problems
+* add a function that you can custom request headers
+
 <h4>2020.02.10</h4>
-* Resolved an issue where files could not be merged when log level is NONE
+* resolved an issue where files could not be merged when log level is NONE
 
 <h4>2020.01.14</h4>
 * add progress listener feature
