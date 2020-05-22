@@ -415,7 +415,7 @@ public class M3u8DownloadFactory {
             }
             if (!StringUtils.isEmpty(key)) {
                 key = key.replace("\"", "");
-                return getUrlContent(StringUtils.isUrl(key) ? key : relativeUrl + key, true).toString().replaceAll("\\s+", "");
+                return getUrlContent(StringUtils.isUrl(key) ? key : mergeUrl(relativeUrl, key), true).toString().replaceAll("\\s+", "");
             }
             return null;
         }
@@ -538,11 +538,17 @@ public class M3u8DownloadFactory {
         private String mergeUrl(String start, String end) {
             if (end.startsWith("/"))
                 end = end.replaceFirst("/", "");
-            for (String s1 : end.split("/")) {
-                if (start.contains(s1))
-                    start = start.replace(s1 + "/", "");
+            int position = 0;
+            String subEnd, tempEnd = end;
+            while ((position = end.indexOf("/", position)) != -1) {
+                subEnd = end.substring(0, position + 1);
+                if (start.endsWith(subEnd)) {
+                    tempEnd = end.replaceFirst(subEnd, "");
+                    break;
+                }
+                ++position;
             }
-            return start + end;
+            return start + tempEnd;
         }
 
         public String getDOWNLOADURL() {

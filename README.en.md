@@ -59,6 +59,9 @@ m3u8Download.start();
 
 <h2>log</h2>
 
+<h4>2020.05.22</h4>
+* fix a bug that it can't correctly obtain a link
+
 <h4>2020.04.01</h4>
 * fix link conversion problems
 * add a function that you can custom request headers
