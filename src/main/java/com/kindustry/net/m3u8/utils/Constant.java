@@ -13,6 +13,8 @@ public class Constant {
   // 文件分隔符，在window中为\\，在linux中为/
   public static final String FILESEPARATOR = System.getProperty("file.separator");
 
+  public static final String TEMPDIR = System.getProperty("user.home") + FILESEPARATOR + "temp" + FILESEPARATOR;
+
   // 因子
   public static final float FACTOR = 1.15F;
 

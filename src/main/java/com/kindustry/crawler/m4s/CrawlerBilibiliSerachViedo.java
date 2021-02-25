@@ -1,4 +1,4 @@
-package com.kindustry.net.m4s;
+package com.kindustry.crawler.m4s;
 
 import crawler.utils.GetWebData;
 import crawler.utils.StringUtils;

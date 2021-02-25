@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Security;
@@ -142,6 +143,13 @@ public class M3u8DownloadFactory {
       // 如果生成目录不存在，则创建
       File file1 = new File(dir);
       if (!file1.exists()) file1.mkdirs();
+      String prefix = "   ";
+      try {
+        Files.createTempDirectory(prefix).toAbsolutePath();
+      } catch (IOException e1) {
+        e1.printStackTrace();
+      }
+
       // 执行多线程下载
       for (String s : tsSet) {
         i++;

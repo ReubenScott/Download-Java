@@ -1,5 +1,7 @@
 package com.kindustry.net.m3u8.main;
 
+import java.util.Properties;
+
 import com.kindustry.net.m3u8.download.M3u8DownloadFactory;
 import com.kindustry.net.m3u8.listener.DownloadListener;
 import com.kindustry.net.m3u8.utils.Constant;
@@ -12,16 +14,22 @@ import com.kindustry.net.m3u8.utils.Constant;
 
 public class M3u8Main {
 
-  private static final String M3U8URL = "https://videozmcdn.stz8.com:8091/20191127/PK7a0LKQ/index.m3u8";
+  private static final String M3U8URL = "https://filegroup.gtv.org/group5/vm3u8/20201223/22/26/5fe3c40093a06b22d9e0cd98/hls.m3u8";
 
   public static void main(String[] args) {
     // "https://videozmcdn.stz8.com:8091/20191127/PK7a0LKQ/index.m3u8";
     // "http://playertest.longtailvideo.com/adaptive/bipbop/gear4/prog_index.m3u8"
+
+    // socks代理服务器的地址与端口
+    Properties prop = System.getProperties();
+    prop.setProperty("socksProxyHost", "127.0.0.1");
+    prop.setProperty("socksProxyPort", "8580");
+
     M3u8DownloadFactory.M3u8Download m3u8Download = M3u8DownloadFactory.getInstance(M3U8URL);
     // 设置生成目录
-    m3u8Download.setDir("D://m3u8JavaTest1");
+    m3u8Download.setDir("F://m3u8JavaTest1");
     // 设置视频名称
-    m3u8Download.setFileName("test");
+    m3u8Download.setFileName("The Fall of Cabal Sequel EP5");
     // 设置线程数
     m3u8Download.setThreadCount(100);
     // 设置重试次数
