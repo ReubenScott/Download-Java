@@ -1,6 +1,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <artifactId>download</artifactId>
+  <version>1.0</version>
+  <packaging>war</packaging>
 
   <parent>
     <groupId>com.kindustry</groupId>
@@ -10,22 +12,79 @@
   </parent>
 
   <build>
-    <sourceDirectory>src</sourceDirectory>
+    <finalName>download</finalName>
+    
     <plugins>
+      <!-- compiler插件, 设定JDK版本 -->
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+
+      <!-- 配置Maven插件将本地Jar打包进War中 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-dependencies</id>
+            <phase>package</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/${project.build.finalName}/WEB-INF/lib</outputDirectory>
+              <includeScope>system</includeScope>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- shade插件配置 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+      </plugin>
+
+
+      <!-- jetty:run plugin -->
+      <plugin>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-maven-plugin</artifactId>
+      </plugin>
+
+      <!-- JBoss deploy plugin -->
+      <plugin>
+        <groupId>org.wildfly.plugins</groupId>
+        <artifactId>wildfly-maven-plugin</artifactId>
+      </plugin>
+      
+      
+      <!-- tomcat:run plugin -->
+      <plugin>
+        <groupId>org.apache.tomcat.maven</groupId>
+        <artifactId>tomcat7-maven-plugin</artifactId>
       </plugin>
     </plugins>
   </build>
 
 
   <dependencies>
- <!-- 配置项目依赖 <dependency> <groupId>com.kindustry</groupId> <artifactId>core</artifactId> </dependency> -->
-  
+    <!-- 配置项目依赖 -->
     <dependency>
       <groupId>com.kindustry</groupId>
       <artifactId>core</artifactId>
+      <scope>system</scope>
+      <systemPath>${basedir}/../epl-platform-core/target/core-1.0.jar</systemPath>
     </dependency>
+      
+      
+    <!-- J2EE -->
+    <dependency>
+      <groupId>javax</groupId>
+      <artifactId>javaee-api</artifactId>
+    </dependency>
+      
       
     <dependency>
       <groupId>org.jsoup</groupId>
@@ -90,6 +149,35 @@
       <groupId>org.springframework</groupId>
       <artifactId>spring-test</artifactId>
     </dependency>
+    
+    
+    <!-- logback+slf4j start -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <type>jar</type>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <type>jar</type>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.janino</groupId>
+      <artifactId>janino</artifactId>
+    </dependency>
+    <!-- logback+slf4j  end  -->
+    
+    
+    
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+    </dependency>
+    
   </dependencies>
+
+
+
 
 </project>
